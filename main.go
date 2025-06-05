@@ -29,6 +29,7 @@ type ChartRequest struct {
 	GroupBy       []string `json:"groupBy"`
 	GroupFilter   []string `json:"groupFilter"`
 	CentileFilter []string `json:"centileFilter"`
+	ChartType     string   `json:"chartType"`
 }
 
 // ChartResponse represents the response from the /chart endpoint
@@ -51,6 +52,11 @@ func generateChart(req ChartRequest) (string, error) {
 	title := req.Metric
 	subtitle := "From " + req.From + " To " + req.To
 
+	// Add chart type to subtitle if specified
+	if req.ChartType != "" {
+		subtitle += " (" + req.ChartType + ")"
+	}
+
 	// Set global options
 	line.SetGlobalOptions(
 		charts.WithInitializationOpts(opts.Initialization{
@@ -70,45 +76,89 @@ func generateChart(req ChartRequest) (string, error) {
 	// Enable legend
 	line.SetGlobalOptions(charts.WithLegendOpts(opts.Legend{}))
 
-	// Generate mock data
-	days := 30 // Mock data for 30 days
+	// Generate mock data based on chart type
 	xAxis := make([]string, 0)
 
-	// Generate x-axis labels (dates)
-	startDate, _ := time.Parse("2006-01-02", req.From)
-	for i := 0; i < days; i++ {
-		date := startDate.AddDate(0, 0, i)
-		if date.After(time.Now()) {
-			break
-		}
-		xAxis = append(xAxis, date.Format("2006-01-02"))
-	}
-
-	// Set x-axis
-	line.SetXAxis(xAxis)
-
-	// Generate series data for each group
-	for _, group := range req.GroupBy {
-		// Generate random data for this group
-		data := make([]opts.LineData, 0)
-		for i := 0; i < len(xAxis); i++ {
-			// Generate random value between 10 and 100
-			value := random.Intn(90) + 10
-			data = append(data, opts.LineData{Value: value})
+	if req.ChartType == "Percentile" {
+		// For percentile chart, x-axis is percentiles
+		if len(req.CentileFilter) > 0 {
+			xAxis = req.CentileFilter
+		} else {
+			// Default percentiles if none selected
+			xAxis = []string{"p50", "p75", "p90", "p95", "p99"}
 		}
 
-		// Add the series to the chart
-		line.AddSeries(group, data)
-	}
+		// Set x-axis
+		line.SetXAxis(xAxis)
 
-	// If no groups were selected, add a default series
-	if len(req.GroupBy) == 0 {
-		data := make([]opts.LineData, 0)
-		for i := 0; i < len(xAxis); i++ {
-			value := random.Intn(90) + 10
-			data = append(data, opts.LineData{Value: value})
+		// Generate series data for each group
+		for _, group := range req.GroupBy {
+			// Generate random data for this group
+			data := make([]opts.LineData, 0)
+			for i := 0; i < len(xAxis); i++ {
+				// Generate random value between 10 and 100
+				// Higher percentiles should generally have higher values
+				baseValue := 10 + i*15
+				variance := random.Intn(10)
+				value := baseValue + variance
+				data = append(data, opts.LineData{Value: value})
+			}
+
+			// Add the series to the chart
+			line.AddSeries(group, data)
 		}
-		line.AddSeries("Default", data)
+
+		// If no groups were selected, add a default series
+		if len(req.GroupBy) == 0 {
+			data := make([]opts.LineData, 0)
+			for i := 0; i < len(xAxis); i++ {
+				baseValue := 10 + i*15
+				variance := random.Intn(10)
+				value := baseValue + variance
+				data = append(data, opts.LineData{Value: value})
+			}
+			line.AddSeries("Default", data)
+		}
+	} else {
+		// Default to Time-series chart
+		days := 30 // Mock data for 30 days
+
+		// Generate x-axis labels (dates)
+		startDate, _ := time.Parse("2006-01-02", req.From)
+		for i := 0; i < days; i++ {
+			date := startDate.AddDate(0, 0, i)
+			if date.After(time.Now()) {
+				break
+			}
+			xAxis = append(xAxis, date.Format("2006-01-02"))
+		}
+
+		// Set x-axis
+		line.SetXAxis(xAxis)
+
+		// Generate series data for each group
+		for _, group := range req.GroupBy {
+			// Generate random data for this group
+			data := make([]opts.LineData, 0)
+			for i := 0; i < len(xAxis); i++ {
+				// Generate random value between 10 and 100
+				value := random.Intn(90) + 10
+				data = append(data, opts.LineData{Value: value})
+			}
+
+			// Add the series to the chart
+			line.AddSeries(group, data)
+		}
+
+		// If no groups were selected, add a default series
+		if len(req.GroupBy) == 0 {
+			data := make([]opts.LineData, 0)
+			for i := 0; i < len(xAxis); i++ {
+				value := random.Intn(90) + 10
+				data = append(data, opts.LineData{Value: value})
+			}
+			line.AddSeries("Default", data)
+		}
 	}
 
 	// Set line style options

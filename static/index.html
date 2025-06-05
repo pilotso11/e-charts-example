@@ -108,6 +108,26 @@
                     </div>
                 </div>
 
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Chart Type</label>
+                        <div class="d-flex">
+                            <div class="form-check me-4">
+                                <input class="form-check-input" type="radio" name="chartType" id="percentileOption" value="Percentile" checked>
+                                <label class="form-check-label" for="percentileOption">
+                                    Percentile
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="chartType" id="timeSeriesOption" value="Time-series" disabled>
+                                <label class="form-check-label" for="timeSeriesOption">
+                                    Time-series
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="row">
                     <div class="col-12">
                         <button type="submit" class="btn btn-primary">Create Chart</button>
@@ -122,9 +142,83 @@
             <!-- Hiding the reportData div as we're now using the iframe -->
             <div id="reportData" style="display: none;"></div>
         </div>
+
+        <script>
+            // Listen for messages from the iframe
+            window.addEventListener('message', function(event) {
+                // Check if the message is a resize request
+                if (event.data && event.data.type === 'resize') {
+                    // Get the iframe
+                    const iframe = document.getElementById('reportFrame');
+                    // Set the height with a small buffer
+                    iframe.style.height = (event.data.height + 20) + 'px';
+                }
+            });
+        </script>
     </div>
 
     <script>
+        // Function to create HTML content with resize script
+        function createIframeContent(content, isError = false) {
+            // Create the HTML structure with the resize script
+            return `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        body {
+                            margin: 0;
+                            padding: 0;
+                            overflow-x: hidden;
+                            ${isError ? 'font-family: sans-serif;' : ''}
+                        }
+                        .chart-container {
+                            width: 100%;
+                            height: auto;
+                            overflow: auto;
+                            display: flex;
+                            flex-direction: column;
+                            ${isError ? 'padding: 20px;' : ''}
+                        }
+                        ${isError ? '.error { color: red; }' : ''}
+                    </style>
+                    <script>
+                        // Function to send the content height to the parent window
+                        function sendHeight() {
+                            // Get the height of the document
+                            const height = Math.max(
+                                document.body.scrollHeight,
+                                document.documentElement.scrollHeight,
+                                document.body.offsetHeight,
+                                document.documentElement.offsetHeight,
+                                document.body.clientHeight,
+                                document.documentElement.clientHeight
+                            );
+
+                            // Send the height to the parent window
+                            window.parent.postMessage({
+                                type: 'resize',
+                                height: height
+                            }, '*');
+                        }
+
+                        // Send height when the page loads
+                        window.addEventListener('load', sendHeight);
+
+                        // Also send height after a short delay to account for any dynamic content
+                        setTimeout(sendHeight, 100);
+                    <\/script>
+                </head>
+                <body>
+                    <div class="chart-container">
+                        ${content}
+                    </div>
+                </body>
+                </html>`;
+        }
+
         document.getElementById('chartForm').addEventListener('submit', function(e) {
             e.preventDefault();
 
@@ -141,6 +235,9 @@
             // Get selected centile filters
             const centileFilters = $('#centileFilter').val();
 
+            // Get selected chart type
+            const chartType = document.querySelector('input[name="chartType"]:checked').value;
+
             // Create request payload
             const payload = {
                 from: fromDate,
@@ -148,7 +245,8 @@
                 metric: metric,
                 groupBy: groupBy,
                 groupFilter: groupFilter,
-                centileFilter: centileFilters
+                centileFilter: centileFilters,
+                chartType: chartType
             };
 
             // Send POST request to /chart endpoint
@@ -161,34 +259,8 @@
             })
             .then(response => response.text())
             .then(html => {
-                // Wrap the chart HTML in a container with proper styling
-                const wrappedHtml = `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <style>
-                        body {
-                            margin: 0;
-                            padding: 0;
-                            overflow-x: hidden;
-                        }
-                        .chart-container {
-                            width: 100%;
-                            height: 100%;
-                            overflow: auto;
-                            display: flex;
-                            flex-direction: column;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="chart-container">
-                        ${html}
-                    </div>
-                </body>
-                </html>`;
+                // Use the createIframeContent function to wrap the chart HTML
+                const wrappedHtml = createIframeContent(html);
 
                 // Display the HTML response directly in the iframe
                 const reportFrame = document.getElementById('reportFrame');
@@ -200,47 +272,16 @@
             .catch(error => {
                 console.error('Error:', error);
 
-                // Create error HTML content with the same container structure
-                const errorContent = `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <style>
-                        body {
-                            margin: 0;
-                            padding: 0;
-                            overflow-x: hidden;
-                            font-family: sans-serif;
-                        }
-                        .chart-container {
-                            width: 100%;
-                            height: 100%;
-                            overflow: auto;
-                            padding: 20px;
-                            display: flex;
-                            flex-direction: column;
-                        }
-                        .error {
-                            color: red;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="chart-container">
-                        <h3 class="error">Error</h3>
-                        <p class="error">${error.message}</p>
-                    </div>
-                </body>
-                </html>`;
+                // Create error content using the createIframeContent function
+                const errorHtml = `<h3 class="error">Error</h3><p class="error">${error.message}</p>`;
+                const errorContent = createIframeContent(errorHtml, true);
 
                 // Display the error in the iframe
                 const reportFrame = document.getElementById('reportFrame');
                 reportFrame.srcdoc = errorContent;
 
                 // Also keep a copy in the hidden reportData div
-                document.getElementById('reportData').innerHTML = errorContent;
+                document.getElementById('reportData').innerHTML = errorHtml;
             });
         });
     </script>
@@ -284,6 +325,60 @@
             $('#centileFilter').select2({
                 placeholder: "Select centile options",
                 allowClear: true
+            });
+
+            // Function to check if time series option should be enabled
+            function updateTimeSeriesAvailability() {
+                const groupByValues = $('#groupBy').val() || [];
+                const timeSeriesOption = document.getElementById('timeSeriesOption');
+                const percentileOption = document.getElementById('percentileOption');
+
+                // Check if month or day are selected
+                const hasTimeOption = groupByValues.includes('month') || groupByValues.includes('day');
+
+                // Enable/disable time series option
+                timeSeriesOption.disabled = !hasTimeOption;
+
+                // If time series is selected but should be disabled, switch to percentile
+                if (timeSeriesOption.checked && !hasTimeOption) {
+                    percentileOption.checked = true;
+                    timeSeriesOption.checked = false;
+                    // Update UI to reflect the change
+                    updateChartTypeUI();
+                }
+            }
+
+            // Handle chart type toggle
+            function updateChartTypeUI() {
+                const chartType = document.querySelector('input[name="chartType"]:checked').value;
+                const centileFilterContainer = document.querySelector('#centileFilter').closest('.col-md-6');
+
+                if (chartType === 'Percentile') {
+                    // For Percentile charts, highlight the centile filter
+                    centileFilterContainer.style.opacity = '1';
+                    centileFilterContainer.querySelector('.form-label').innerHTML = 
+                        'Centile Filter <span class="text-primary">(Used as X-axis for Percentile chart)</span>';
+                } else {
+                    // For Time-series charts, slightly dim the centile filter
+                    centileFilterContainer.style.opacity = '0.9';
+                    centileFilterContainer.querySelector('.form-label').innerHTML = 'Centile Filter';
+                }
+            }
+
+            // Initialize UI based on default selection
+            updateChartTypeUI();
+
+            // Initialize time series availability
+            updateTimeSeriesAvailability();
+
+            // Add event listeners to radio buttons
+            document.querySelectorAll('input[name="chartType"]').forEach(radio => {
+                radio.addEventListener('change', updateChartTypeUI);
+            });
+
+            // Add event listener to groupBy dropdown
+            $('#groupBy').on('change', function() {
+                updateTimeSeriesAvailability();
             });
         });
     </script>
