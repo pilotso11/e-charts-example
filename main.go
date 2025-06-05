@@ -23,13 +23,14 @@ var indexHTML string
 
 // ChartRequest represents the form data sent to the /chart endpoint
 type ChartRequest struct {
-	From          string   `json:"from"`
-	To            string   `json:"to"`
-	Metric        string   `json:"metric"`
-	GroupBy       []string `json:"groupBy"`
-	GroupFilter   []string `json:"groupFilter"`
-	CentileFilter []string `json:"centileFilter"`
-	ChartType     string   `json:"chartType"`
+	From              string   `json:"from"`
+	To                string   `json:"to"`
+	Metric            string   `json:"metric"`
+	GroupBy           []string `json:"groupBy"`
+	GroupFilter       []string `json:"groupFilter"`
+	CentileFilter     []string `json:"centileFilter"`
+	ParentOrderIdFilter []string `json:"parentOrderIdFilter"`
+	ChartType         string   `json:"chartType"`
 }
 
 // ChartResponse represents the response from the /chart endpoint

@@ -70,6 +70,9 @@
                             <option value="symbol">Symbol</option>
                             <option value="month">Month</option>
                             <option value="day">Day</option>
+                            <option value="hour">Hour</option>
+                            <option value="minute">Minute</option>
+                            <option value="parent_order_id">Parent Order ID</option>
                         </select>
                         <div class="form-text">Click to select multiple options</div>
                     </div>
@@ -89,6 +92,10 @@
                             <option value="api_to_or">API to OR</option>
                             <option value="or_to_mc">OR to MC</option>
                             <option value="venue_round_trip">Venue Round Trip</option>
+                            <option value="internal_md_to_api_create">Internal MD</option>
+                            <option value="api_to_mc">API to MC</option>
+                            <option value="mc_to_venue">MC to Venue</option>
+                            <option value="venue_to_mc">Venue to MC</option>
                         </select>
                     </div>
 
@@ -109,6 +116,12 @@
                 </div>
 
                 <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="parentOrderIdFilter" class="form-label">Parent Order ID Filter</label>
+                        <select class="form-select" id="parentOrderIdFilter" multiple></select>
+                        <div class="form-text">Enter integer values and press Enter to add multiple filters</div>
+                    </div>
+
                     <div class="col-md-6">
                         <label class="form-label">Chart Type</label>
                         <div class="d-flex">
@@ -235,6 +248,9 @@
             // Get selected centile filters
             const centileFilters = $('#centileFilter').val();
 
+            // Get parent order ID filters
+            const parentOrderIdFilters = $('#parentOrderIdFilter').val();
+
             // Get selected chart type
             const chartType = document.querySelector('input[name="chartType"]:checked').value;
 
@@ -246,6 +262,7 @@
                 groupBy: groupBy,
                 groupFilter: groupFilter,
                 centileFilter: centileFilters,
+                parentOrderIdFilter: parentOrderIdFilters,
                 chartType: chartType
             };
 
@@ -327,14 +344,33 @@
                 allowClear: true
             });
 
+            $('#parentOrderIdFilter').select2({
+                placeholder: "Enter integer values and press Enter",
+                allowClear: true,
+                tags: true,
+                tokenSeparators: [',', ' '],
+                createTag: function(params) {
+                    // Only allow integer values
+                    const term = params.term.trim();
+                    if (term === '' || !/^\d+$/.test(term)) {
+                        return null; // Don't create a tag if not an integer
+                    }
+                    return {
+                        id: term,
+                        text: term
+                    };
+                }
+            });
+
             // Function to check if time series option should be enabled
             function updateTimeSeriesAvailability() {
                 const groupByValues = $('#groupBy').val() || [];
                 const timeSeriesOption = document.getElementById('timeSeriesOption');
                 const percentileOption = document.getElementById('percentileOption');
 
-                // Check if month or day are selected
-                const hasTimeOption = groupByValues.includes('month') || groupByValues.includes('day');
+                // Check if month, day, hour, or minute are selected
+                const hasTimeOption = groupByValues.includes('month') || groupByValues.includes('day') || 
+                                     groupByValues.includes('hour') || groupByValues.includes('minute');
 
                 // Enable/disable time series option
                 timeSeriesOption.disabled = !hasTimeOption;
