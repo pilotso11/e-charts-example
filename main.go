@@ -2,10 +2,14 @@ package main
 
 import (
 	"bytes"
+	"context"
+	_ "embed"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,6 +17,9 @@ import (
 	"github.com/go-echarts/go-echarts/v2/opts"
 	"github.com/go-echarts/go-echarts/v2/types"
 )
+
+//go:embed static/index.html
+var indexHTML string
 
 // ChartRequest represents the form data sent to the /chart endpoint
 type ChartRequest struct {
@@ -123,13 +130,11 @@ func main() {
 	// Create a default gin router
 	router := gin.Default()
 
-	// Ensure static directory exists
-	if err := os.MkdirAll("static", 0755); err != nil {
-		log.Fatalf("Failed to create static directory: %v", err)
-	}
-
-	// Serve static files
-	router.Static("/", "./static")
+	// Serve the embedded index.html at the root path
+	router.GET("/", func(c *gin.Context) {
+		c.Header("Content-Type", "text/html")
+		c.String(http.StatusOK, indexHTML)
+	})
 
 	// Handle POST requests to /chart endpoint
 	router.POST("/chart", func(c *gin.Context) {
@@ -159,6 +164,37 @@ func main() {
 		c.String(http.StatusOK, html)
 	})
 
-	log.Println("Server starting on http://localhost:8080")
-	router.Run(":8080")
+	// Create a server with the router
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: router,
+	}
+
+	// Create a channel to listen for OS signals
+	quit := make(chan os.Signal, 1)
+	// SIGINT (Ctrl+C), SIGTERM (kill command)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	// Start the server in a goroutine
+	go func() {
+		log.Println("Server starting on http://localhost:8080")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
+
+	// Wait for a signal to quit
+	<-quit
+	log.Println("Shutting down server...")
+
+	// Create a context with a timeout for shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Attempt to gracefully shut down the server
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("Server exited properly")
 }
