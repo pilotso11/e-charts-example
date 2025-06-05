@@ -138,6 +138,12 @@
                                 </label>
                             </div>
                         </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="logScale">
+                            <label class="form-check-label" for="logScale">
+                                Use logarithmic scale
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -254,6 +260,9 @@
             // Get selected chart type
             const chartType = document.querySelector('input[name="chartType"]:checked').value;
 
+            // Get log scale option
+            const logScale = document.getElementById('logScale').checked;
+
             // Create request payload
             const payload = {
                 from: fromDate,
@@ -263,7 +272,8 @@
                 groupFilter: groupFilter,
                 centileFilter: centileFilters,
                 parentOrderIdFilter: parentOrderIdFilters,
-                chartType: chartType
+                chartType: chartType,
+                logScale: logScale
             };
 
             // Send POST request to /chart endpoint
@@ -379,6 +389,13 @@
                 if (timeSeriesOption.checked && !hasTimeOption) {
                     percentileOption.checked = true;
                     timeSeriesOption.checked = false;
+                    // Update UI to reflect the change
+                    updateChartTypeUI();
+                }
+                // If time options are selected, default to time-series
+                else if (hasTimeOption && !timeSeriesOption.checked) {
+                    timeSeriesOption.checked = true;
+                    percentileOption.checked = false;
                     // Update UI to reflect the change
                     updateChartTypeUI();
                 }

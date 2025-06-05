@@ -31,6 +31,7 @@ type ChartRequest struct {
 	CentileFilter     []string `json:"centileFilter"`
 	ParentOrderIdFilter []string `json:"parentOrderIdFilter"`
 	ChartType         string   `json:"chartType"`
+	LogScale          bool     `json:"logScale"`
 }
 
 // ChartResponse represents the response from the /chart endpoint
@@ -76,6 +77,14 @@ func generateChart(req ChartRequest) (string, error) {
 
 	// Enable legend
 	line.SetGlobalOptions(charts.WithLegendOpts(opts.Legend{}))
+
+	// Set y-axis to log scale if requested
+	if req.LogScale {
+		line.SetGlobalOptions(charts.WithYAxisOpts(opts.YAxis{
+			Type: "log",
+			Name: "Log Scale",
+		}))
+	}
 
 	// Generate mock data based on chart type
 	xAxis := make([]string, 0)
