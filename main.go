@@ -126,8 +126,8 @@ func generateChart(req ChartRequest) (string, error) {
 	return buffer.String(), nil
 }
 
-func main() {
-	// Create a default gin router
+// setupRouter creates a gin router with all the routes configured
+func setupRouter() *gin.Engine {
 	router := gin.Default()
 
 	// Serve the embedded index.html at the root path
@@ -163,6 +163,13 @@ func main() {
 		c.Header("Content-Type", "text/html")
 		c.String(http.StatusOK, html)
 	})
+
+	return router
+}
+
+func main() {
+	// Create a router using the setupRouter function
+	router := setupRouter()
 
 	// Create a server with the router
 	srv := &http.Server{
